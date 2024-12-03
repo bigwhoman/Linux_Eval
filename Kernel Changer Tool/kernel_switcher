@@ -1,0 +1,213 @@
+#!/bin/bash
+
+# File locations
+LOG_FILE="/var/log/kernel_switches.log"
+CYCLE_FILE="/var/log/kernel_cycle.tmp"
+STARTUP_SCRIPT="/etc/systemd/system/kernel-cycle.service"
+LAST_BOOT_FILE="/var/log/last_successful_kernel.tmp"
+TRIES_FILE="/var/log/cycle_tries.tmp"
+# Check if script is run as root
+if [ "$EUID" -ne 0 ]; then 
+    echo "Please run as root"
+    exit 1
+fi
+
+# Clean up any existing service and files
+cleanup_old_service() {
+    sudo systemctl stop kernel-cycle.service 2>/dev/null
+    sudo systemctl disable kernel-cycle.service 2>/dev/null
+    sudo rm -rf "$STARTUP_SCRIPT"
+    sudo rm -rf "$CYCLE_FILE" "$LAST_BOOT_FILE" 
+    sudo systemctl daemon-reload
+    echo "Cleaned up old service and files"
+}
+
+version_extract(){
+    return $(grep "menuentry '" /boot/grub/grub.cfg | grep "with Linux 6" | grep -v "recovery mode" | grep -v old | sed "s/menuentry '\([^']*\)'.*/\1/" | sed 's/^[ \t]*//;s/[ \t]*$//' | awk -F'.' '
+{
+    key = $1 "." $2
+    if (key in versions) {
+        split(versions[key], current, ".")
+        split($0, new, ".")
+        if (new[3] > current[3]) {
+            versions[key] = $0
+        }
+    } else {
+        versions[key] = $0
+    }
+}
+END {
+    for (key in versions) {
+        print "Advanced options for Ubuntu>" versions[key]
+    }
+}' | sort -V)
+
+}
+
+# Function to set up and verify systemd service
+setup_and_verify_service() {
+    cleanup_old_service
+    
+    # Create new systemd service file with proper ownership and permissions
+    cat > "$STARTUP_SCRIPT" << EOF
+[Unit]
+Description=Kernel Cycling Service
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+ExecStart=$(readlink -f "$0")
+User=root
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Set proper permissions
+    chmod 644 "$STARTUP_SCRIPT"
+    chown root:root "$STARTUP_SCRIPT"
+
+    # Reload systemd and enable service
+    systemctl daemon-reload
+    systemctl enable kernel-cycle.service
+
+    # Verify service status
+    if ! systemctl is-enabled kernel-cycle.service >/dev/null 2>&1; then
+        echo "Failed to enable systemd service. Check journalctl for details."
+        exit 1
+    fi
+
+    echo "Systemd service successfully configured and enabled."
+    
+    # Double-check service file contents
+    echo "Verifying service file contents:"
+    cat "$STARTUP_SCRIPT"
+}
+
+# Get current kernel version
+current_kernel=$(uname -r | cut -d. -f1,2)
+echo "Current kernel version: $current_kernel"
+
+# Get only the first three kernels
+mapfile -t kernel_list < <(grep "menuentry '" /boot/grub/grub.cfg | \
+  grep "with Linux 6" | \
+  grep -v "recovery mode" | \
+  grep -v old | \
+  sed "s/menuentry '\([^']*\)'.*/\1/" | \
+  sed 's/^[ \t]*//;s/[ \t]*$//' | \
+  awk -F'.' '
+  {
+    key = $1 "." $2
+    if (key in versions) {
+      split(versions[key], current, ".")
+      split($0, new, ".")
+      if (new[3] > current[3]) {
+        versions[key] = $0
+      }
+    } else {
+      versions[key] = $0
+    }
+  }
+  END {
+    for (key in versions) {
+      print "Advanced options for Ubuntu>" versions[key]
+    }
+  }' | sort -V)
+
+
+# Verify we have three valid kernels
+if [ ${#kernel_list[@]} -lt 1 ]; then
+    echo "Error: Not enough kernels found."
+    exit 1
+fi
+
+# Display the three kernels we'll be using
+echo -e "\nWill cycle through these three kernels:"
+printf '%s\n' "${kernel_list[@]}"
+
+# First-time setup: create service and verify it's working
+if [ ! -f "$CYCLE_FILE" ]; then
+    echo "First run - setting up systemd service..."
+    setup_and_verify_service
+    
+    # Initialize cycle count
+    echo "0" > "$CYCLE_FILE"
+    # echo "0" > "$TRIES_FILE"
+    echo "Service verified. System will reboot to start kernel cycling."
+    # Store current kernel as initial successful boot
+    echo "$current_kernel" > "$LAST_BOOT_FILE"
+    
+    # Log start of cycle
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting kernel cycling with kernel $current_kernel" >> "$LOG_FILE"
+    
+    # Start the service
+
+
+    systemctl start kernel-cycle.service
+    
+    # Verify service started successfully
+    if ! systemctl is-active kernel-cycle.service >/dev/null 2>&1; then
+        echo "Failed to start service. Check journalctl for details."
+        cleanup_old_service
+        exit 1
+    fi
+    
+    echo "Service started successfully. Rebooting in 5 seconds..."
+    sleep 5
+    reboot
+fi
+
+# Regular run after service is set up
+count=$(cat "$CYCLE_FILE")
+
+echo $(pwd)
+
+sudo /home/bigwhoman/Downloads/LEBench/LEBench/TEST_DIR/OS_Eval 0 $(uname -r) > /home/bigwhoman/"$(uname -r).out"
+
+echo "Current cycle: $count"
+echo "Current try: $tries"
+count=$((count + 1))
+if [ "$count" -ge ${#kernel_list[@]} ]; then
+    echo "Completed cycling through all kernels"
+    cleanup_old_service
+    echo "Kernel cycling complete. Service cleaned up."
+    exit 0
+fi
+# count=$((tries + 1))
+echo "$count" > "$CYCLE_FILE"
+
+# Find current kernel index
+current_index=-1
+for i in "${!kernel_list[@]}"; do
+    if [[ "${kernel_list[$i]}" == *"$current_kernel"* ]]; then
+        current_index=$i
+        echo "current index = $i"
+        break
+    fi
+done
+
+# Calculate next kernel index
+next_index=$(( ($count + 1)))
+next_kernel="${kernel_list[$next_index]}"
+
+echo -e "\nSwitching to kernel: $next_kernel"
+
+# Update GRUB default
+if [ -f /etc/default/grub ]; then
+        # Save current kernel version and next kernel version to log
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Switching from $current_kernel to $next_kernel (Cycle $count/${#kernel_list[@]})" >> "$LOG_FILE"
+        
+        # Set GRUB to boot the next kernel
+        sudo sed -i "s/GRUB_DEFAULT=.*/GRUB_DEFAULT=\"$next_kernel\"/" /etc/default/grub
+        sudo update-grub
+
+        echo -e "\nSystem will restart in 5 seconds to boot into kernel $next_kernel..."
+        sleep 5
+        reboot
+else
+    echo "Error: GRUB configuration file not found"
+    exit 1
+fi
