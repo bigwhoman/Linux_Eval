@@ -29,7 +29,7 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
 
 cfg = {
-    'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
+   'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
 }
 
 class VGG(nn.Module):
@@ -61,7 +61,7 @@ class VGG(nn.Module):
 # Benchmarking function
 def benchmark_training(device, train_loader, num_epochs):
     device = torch.device(device)
-    model = VGG('VGG19').to(device)
+    model = VGG('VGG11').to(device)
     model.train()
     total_time = 0
     criterion = nn.CrossEntropyLoss()
