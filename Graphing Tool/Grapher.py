@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 import re
+from packaging import version
 
 def extract_version(filename):
     """
@@ -12,9 +13,15 @@ def extract_version(filename):
     """
     match = re.search(r'output\.(\d+\.\d+)', filename)
     if match:
-        version = match.group(1)
-        return version
+        version_str = match.group(1)
+        return version_str
     return filename
+
+def version_key(ver_str):
+    """
+    Convert version string to a comparable version object
+    """
+    return version.parse(ver_str)
 
 def read_benchmark_csv(file_path):
     """
@@ -110,8 +117,10 @@ def create_heatmap(csv_folder, center_version):
     # Get all unique tests
     all_tests = sorted(set().union(*[set(d.keys()) for d in data.values()]))
     
+    # Sort versions properly using version_key function
+    versions = sorted(data.keys(), key=version_key)
+    
     # Create DataFrame for relative differences
-    versions = sorted(data.keys())
     df_relative = pd.DataFrame(index=all_tests, columns=versions, dtype=float)
     
     # Calculate relative differences
@@ -152,7 +161,7 @@ def create_heatmap(csv_folder, center_version):
 if __name__ == "__main__":
     # Example usage
     csv_folder = "."  # Current directory, or specify your folder path
-    center_version = "5.13"  # The version to use as reference (only major.minor)
+    center_version = "5.14"  # The version to use as reference (only major.minor)
     
     try:
         create_heatmap(csv_folder, center_version)
