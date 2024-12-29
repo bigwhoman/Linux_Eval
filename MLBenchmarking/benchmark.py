@@ -84,7 +84,7 @@ def benchmark_training(device, train_loader, num_epochs):
 # Run the benchmark
 
 if __name__ == "__main__":
-    print("Benchmarking on GPU:")
-    benchmark_training("cuda", trainloader, 10)
+    #print("Benchmarking on GPU:")
+    #benchmark_training("cuda", trainloader, 10)
     print("Benchmarking on CPU:")
-    benchmark_training("cpu", trainloader, 10)
+    benchmark_training("cpu", trainloader, 1)

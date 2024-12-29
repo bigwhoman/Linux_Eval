@@ -1,0 +1,3 @@
+Files already downloaded and verified
+Benchmarking on CPU:
+Epoch [1/10], Time Taken: 100.66 seconds
