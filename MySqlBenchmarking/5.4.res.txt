@@ -1,0 +1,45 @@
+sysbench 1.0.11 (using system LuaJIT 2.1.0-beta3)
+
+Initializing worker threads...
+
+Creating table 'sbtest1'...
+Inserting 1000000 records into 'sbtest1'
+Creating a secondary index on 'sbtest1'...
+sysbench 1.0.11 (using system LuaJIT 2.1.0-beta3)
+
+Running the test with following options:
+Number of threads: 4
+Initializing random number generator from current time
+
+
+Initializing worker threads...
+
+Threads started!
+
+SQL statistics:
+    queries performed:
+        read:                            440524
+        write:                           125864
+        other:                           62932
+        total:                           629320
+    transactions:                        31466  (262.17 per sec.)
+    queries:                             629320 (5243.46 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+General statistics:
+    total time:                          120.0167s
+    total number of events:              31466
+
+Latency (ms):
+         min:                                  4.63
+         avg:                                 15.25
+         max:                                219.58
+         95th percentile:                     27.17
+         sum:                             479945.95
+
+Threads fairness:
+    events (avg/stddev):           7866.5000/695.81
+    execution time (avg/stddev):   119.9865/0.00
+
+sysbench 1.0.11 (using system LuaJIT 2.1.0-beta3)

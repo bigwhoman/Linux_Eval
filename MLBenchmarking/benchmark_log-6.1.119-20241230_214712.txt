@@ -1,0 +1,8 @@
+Files already downloaded and verified
+Benchmarking on CPU:
+Epoch [1/2], Time Taken: 138.85 seconds
+Epoch [2/2], Time Taken: 136.21 seconds
+
+Average Time per Epoch: 137.53 seconds
+
+Total time: 275.05 seconds

@@ -87,4 +87,4 @@ if __name__ == "__main__":
     #print("Benchmarking on GPU:")
     #benchmark_training("cuda", trainloader, 10)
     print("Benchmarking on CPU:")
-    benchmark_training("cpu", trainloader, 1)
+    benchmark_training("cpu", trainloader, 2)

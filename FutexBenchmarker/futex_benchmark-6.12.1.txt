@@ -1,0 +1,3 @@
+Starting futex benchmark with 1000000 iterations...
+Futex benchmark completed: 1000000 iterations in 164.472484 seconds.
+Average Futex syscall based on 1000000 iterations is 0.000164 seconds.

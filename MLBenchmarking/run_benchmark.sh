@@ -25,7 +25,7 @@ echo "Starting PyTorch Benchmark with syscall tracking..."
 # -f: trace child processes
 # -tt: add time stamps with microsecond precision
 # -o: output to file
-# strace -f -tt -o "strace_log-${kernel_version}-${timestamp}.txt" \
+strace -f -o "strace_log-${kernel_version}-${timestamp}.txt" \
     python3 benchmark.py > "benchmark_log-${kernel_version}-${timestamp}.txt" 2>&1
 
 # Output completion message

@@ -1,0 +1,8 @@
+Downloading https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz to ./data/cifar-10-python.tar.gz
+Benchmarking on CPU:
+Epoch [1/2], Time Taken: 129.25 seconds
+Epoch [2/2], Time Taken: 127.82 seconds
+
+Average Time per Epoch: 128.54 seconds
+
+Total time: 257.07 seconds
