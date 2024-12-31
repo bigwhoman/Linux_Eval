@@ -9,9 +9,9 @@ from packaging import version
 def extract_version(filename):
     """
     Extract Linux version number from filename, keeping only major.minor (e.g., 5.15)
-    Example: 'output.5.15.104_2.csv' -> '5.15'
+    Example: 'LEBenchoutput.5.15.104_2.csv' -> '5.15'
     """
-    match = re.search(r'output\.(\d+\.\d+)', filename)
+    match = re.search(r'(?:output\.)?(\d+\.\d+)', filename)
     if match:
         version_str = match.group(1)
         return version_str
@@ -23,50 +23,82 @@ def version_key(ver_str):
     """
     return version.parse(ver_str)
 
+def test_name_sort_key(test_name):
+    """
+    Custom sorting function for test names.
+    Groups similar tests together and maintains a logical ordering.
+    """
+    # Strip whitespace and convert to lowercase for comparison
+    clean_name = test_name.strip().lower()
+    
+    # Define groups of tests and their order
+    test_groups = {
+        'ref': 0,
+        'cpu': 1,
+        'getpid': 2,
+        'context': 3,
+        'send': 4,
+        'recv': 5,
+        'select': 6,
+        'tcp': 7,
+        'udp': 8,
+        'http': 9,
+        'mmap': 10,
+        'page': 11,
+        'file': 12,
+        'read' : 13,
+        'write' : 14,
+        'munmap' : 15,
+        'fork' : 16
+    }
+    
+    # Find which group the test belongs to
+    group_order = float('inf')
+    for group, order in test_groups.items():
+        if group in clean_name:
+            group_order = order
+            break
+    
+    # Extract any numbers from the test name
+    numbers = re.findall(r'\d+', clean_name)
+    number = int(numbers[0]) if numbers else 0
+    
+    return (group_order, number, clean_name)
+
 def read_benchmark_csv(file_path):
     """
     Read and process a benchmark CSV file.
     Returns a dictionary of test names and their 'kbest' values.
     """
-    # Read CSV, skip the first row which contains the header "OS Benchmark experiment"
     try:
-        df = pd.read_csv(file_path, skiprows=1)
+        # Read CSV, skip the first row which contains the header
+        df = pd.read_csv(file_path, header=0, names=['test', 'value', 'empty'])
+        
+        # Initialize dictionary to store results
+        results = {}
+        
+        # Process each row
+        for _, row in df.iterrows():
+            # Get test name and type (kbest/average)
+            test_info = str(row['test']).strip()
+            if not isinstance(test_info, str) or pd.isna(test_info):
+                continue
+            
+            # Split into test name and type
+            if 'kbest:' in test_info:
+                test_name = test_info.replace('kbest:', '').strip()
+                try:
+                    value = float(row['value'])
+                    if not (pd.isna(value) or np.isinf(value)):
+                        results[test_name] = value
+                except (ValueError, TypeError) as e:
+                    print(f"Warning: Could not convert value for {test_name}: {row['value']}")
+                    continue
+        
+        return results
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
         return {}
-    
-    # Initialize dictionary to store results
-    results = {}
-    
-    # Process each row
-    for _, row in df.iterrows():
-        # Get test name and type (kbest/average)
-        test_info = str(row.iloc[0]).strip()
-        if not isinstance(test_info, str) or pd.isna(test_info):
-            continue
-            
-        # Split into test name and type
-        parts = test_info.rsplit(None, 1)
-        if len(parts) != 2 or parts[1] not in ['kbest:', 'average:']:
-            continue
-            
-        test_name, metric_type = parts
-        test_name = test_name.strip()
-        
-        # Store only 'kbest' values
-        if metric_type == 'kbest:':
-            try:
-                # Convert to float and validate
-                value = float(row.iloc[1])
-                if pd.isna(value) or np.isinf(value):
-                    print(f"Warning: Invalid value for {test_name}: {value}")
-                    continue
-                results[test_name] = value
-            except (ValueError, TypeError) as e:
-                print(f"Warning: Could not convert value for {test_name}: {row.iloc[1]}")
-                continue
-    
-    return results
 
 def combine_version_data(data):
     """
@@ -114,8 +146,8 @@ def create_heatmap(csv_folder, center_version):
     if center_version not in data:
         raise ValueError(f"Center version {center_version} not found in data. Available versions: {list(data.keys())}")
     
-    # Get all unique tests
-    all_tests = sorted(set().union(*[set(d.keys()) for d in data.values()]))
+    # Get all unique tests and sort them using the custom sorting function
+    all_tests = sorted(set().union(*[set(d.keys()) for d in data.values()]), key=test_name_sort_key)
     
     # Sort versions properly using version_key function
     versions = sorted(data.keys(), key=version_key)
