@@ -6,17 +6,16 @@ import numpy as np
 import sys
 
 def parse_strace_file(file_path):
-    # Updated pattern to match pid and syscall names even with resumed calls
-    syscall_pattern = r'\[pid\s+\d+\]\s+(?:<\.\.\.\s+)?(\w+)(?:\s+resumed>|\()'
+    # Updated pattern to match your strace format
+    # Matches: "PID  syscall_name(" or "PID  syscall_name = "
+    syscall_pattern = r'^\d+\s+(\w+)(?:\(|[\s]=)'
     
     syscalls = []
     with open(file_path, 'r') as file:
-        content = file.read()
-        matches = re.finditer(syscall_pattern, content)
-        for match in matches:
-            syscall_name = match.group(1)
-            # Skip if it's not actually a syscall
-            if syscall_name not in ['resumed']:
+        for line in file:
+            match = re.match(syscall_pattern, line)
+            if match:
+                syscall_name = match.group(1)
                 syscalls.append(syscall_name)
     
     return syscalls
@@ -57,7 +56,7 @@ def analyze_syscalls(syscalls, min_percentage=1.0):
     
     return df_filtered, df
 
-def create_visualizations(df_filtered, df_full, output_file=f'syscall_analysis_{sys.argv[1]}.png'):
+def create_visualizations(df_filtered, df_full, output_file='syscall_analysis.png'):
     if df_filtered.empty or df_full.empty:
         print("No data to visualize!")
         return
@@ -121,12 +120,6 @@ def print_statistics(df_filtered, df_full, total_syscalls):
     formatted_data = df_filtered.copy()
     formatted_data['count'] = formatted_data['count'].apply(lambda x: f"{int(x):,}")
     print(formatted_data.to_string(index=False))
-    
-    print("\nComplete System Call Distribution:")
-    print("=" * 50)
-    formatted_full = df_full.copy()
-    formatted_full['count'] = formatted_full['count'].apply(lambda x: f"{int(x):,}")
-    print(formatted_full.to_string(index=False))
 
 def main():
     if len(sys.argv) != 2:
